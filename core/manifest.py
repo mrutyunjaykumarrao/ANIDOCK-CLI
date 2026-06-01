@@ -1,8 +1,5 @@
-import ctypes
-import hashlib
 import json
 import os
-import sys
 import threading
 import time
 
@@ -11,17 +8,6 @@ from core.input_parsing import sanitize_file_part
 
 def make_manifest_path(output_dir: str, anime_title: str) -> str:
     safe_title = sanitize_file_part(anime_title)
-    if os.name == "nt" and getattr(sys, "frozen", False):
-        base_dir = os.getenv("LOCALAPPDATA") or os.path.join(
-            os.path.expanduser("~"),
-            "AppData",
-            "Local",
-        )
-        output_key = os.path.abspath(output_dir).encode("utf-8")
-        output_hash = hashlib.sha1(output_key).hexdigest()[:8]
-        preferred_dir = os.path.join(base_dir, "AniDock", "manifests")
-        manifest_dir = preferred_dir if _is_directory_writable(preferred_dir) else output_dir
-        return os.path.join(manifest_dir, "{0}.{1}.json".format(safe_title, output_hash))
     return os.path.join(output_dir, ".{0}.download_manifest.json".format(safe_title))
 
 
@@ -59,61 +45,8 @@ def load_manifest(manifest_path: str, anime_title: str) -> dict:
 def save_manifest(manifest_path: str, manifest_data: dict) -> None:
     manifest_data["updated_at"] = int(time.time())
     os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
-    _clear_readonly_on_windows(manifest_path)
     with open(manifest_path, "w", encoding="utf-8") as manifest_file:
         json.dump(manifest_data, manifest_file, indent=2, sort_keys=True)
-    _hide_manifest_on_windows(manifest_path)
-
-
-def _hide_manifest_on_windows(manifest_path: str) -> None:
-    if os.name != "nt":
-        return
-    get_attributes = ctypes.windll.kernel32.GetFileAttributesW
-    get_attributes.argtypes = [ctypes.c_wchar_p]
-    get_attributes.restype = ctypes.c_uint32
-    set_attributes = ctypes.windll.kernel32.SetFileAttributesW
-    set_attributes.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
-    set_attributes.restype = ctypes.c_int
-    attributes = get_attributes(manifest_path)
-    if attributes == 0xFFFFFFFF:
-        print("Warning: could not read manifest attributes for hiding: {0}".format(manifest_path))
-        return
-    hidden_flag = 0x2
-    if attributes & hidden_flag:
-        return
-    if not set_attributes(manifest_path, attributes | hidden_flag):
-        print("Warning: could not hide manifest file: {0}".format(manifest_path))
-
-
-def _clear_readonly_on_windows(manifest_path: str) -> None:
-    if os.name != "nt" or not os.path.exists(manifest_path):
-        return
-    get_attributes = ctypes.windll.kernel32.GetFileAttributesW
-    get_attributes.argtypes = [ctypes.c_wchar_p]
-    get_attributes.restype = ctypes.c_uint32
-    set_attributes = ctypes.windll.kernel32.SetFileAttributesW
-    set_attributes.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
-    set_attributes.restype = ctypes.c_int
-    attributes = get_attributes(manifest_path)
-    if attributes == 0xFFFFFFFF:
-        return
-    readonly_flag = 0x1
-    if not (attributes & readonly_flag):
-        return
-    if not set_attributes(manifest_path, attributes & ~readonly_flag):
-        print("Warning: could not clear manifest read-only attribute: {0}".format(manifest_path))
-
-
-def _is_directory_writable(directory_path: str) -> bool:
-    try:
-        os.makedirs(directory_path, exist_ok=True)
-        probe_path = os.path.join(directory_path, ".anidock_write_probe")
-        with open(probe_path, "w", encoding="utf-8") as probe_file:
-            probe_file.write("ok")
-        os.remove(probe_path)
-        return True
-    except OSError:
-        return False
 
 
 def set_manifest_episode_status(
