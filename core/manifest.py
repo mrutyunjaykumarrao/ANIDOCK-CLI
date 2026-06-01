@@ -19,7 +19,8 @@ def make_manifest_path(output_dir: str, anime_title: str) -> str:
         )
         output_key = os.path.abspath(output_dir).encode("utf-8")
         output_hash = hashlib.sha1(output_key).hexdigest()[:8]
-        manifest_dir = os.path.join(base_dir, "AniDock", "manifests")
+        preferred_dir = os.path.join(base_dir, "AniDock", "manifests")
+        manifest_dir = preferred_dir if _is_directory_writable(preferred_dir) else output_dir
         return os.path.join(manifest_dir, "{0}.{1}.json".format(safe_title, output_hash))
     return os.path.join(output_dir, ".{0}.download_manifest.json".format(safe_title))
 
@@ -101,6 +102,18 @@ def _clear_readonly_on_windows(manifest_path: str) -> None:
         return
     if not set_attributes(manifest_path, attributes & ~readonly_flag):
         print("Warning: could not clear manifest read-only attribute: {0}".format(manifest_path))
+
+
+def _is_directory_writable(directory_path: str) -> bool:
+    try:
+        os.makedirs(directory_path, exist_ok=True)
+        probe_path = os.path.join(directory_path, ".anidock_write_probe")
+        with open(probe_path, "w", encoding="utf-8") as probe_file:
+            probe_file.write("ok")
+        os.remove(probe_path)
+        return True
+    except OSError:
+        return False
 
 
 def set_manifest_episode_status(
