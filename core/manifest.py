@@ -1,14 +1,27 @@
+import ctypes
+import hashlib
 import json
 import os
+import sys
 import threading
 import time
-import ctypes
 
 from core.input_parsing import sanitize_file_part
 
 
 def make_manifest_path(output_dir: str, anime_title: str) -> str:
-    return os.path.join(output_dir, ".{0}.download_manifest.json".format(sanitize_file_part(anime_title)))
+    safe_title = sanitize_file_part(anime_title)
+    if os.name == "nt" and getattr(sys, "frozen", False):
+        base_dir = os.getenv("LOCALAPPDATA") or os.path.join(
+            os.path.expanduser("~"),
+            "AppData",
+            "Local",
+        )
+        output_key = os.path.abspath(output_dir).encode("utf-8")
+        output_hash = hashlib.sha1(output_key).hexdigest()[:8]
+        manifest_dir = os.path.join(base_dir, "AniDock", "manifests")
+        return os.path.join(manifest_dir, "{0}.{1}.json".format(safe_title, output_hash))
+    return os.path.join(output_dir, ".{0}.download_manifest.json".format(safe_title))
 
 
 def default_manifest(anime_title: str) -> dict:

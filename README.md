@@ -166,7 +166,11 @@ For each anime folder, AniDock writes a manifest:
 downloads/<Anime Name>/.<Anime Name>.download_manifest.json
 ```
 
-On Windows the manifest file is hidden by default.
+On Windows packaged builds, the manifest is stored under:
+
+```text
+%LOCALAPPDATA%\AniDock\manifests\
+```
 
 From CLI queue setup you can:
 - resume unfinished episodes
