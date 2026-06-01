@@ -65,7 +65,7 @@ pip install pyinstaller
 pyinstaller --onefile --name anidock scraper.py
 ```
 
-The executable will be at `dist\anidock.exe`. Ensure `ffmpeg` is installed and on PATH.
+The executable will be at `dist\anidock.exe`. Ensure `ffmpeg` is installed and on PATH, or place `ffmpeg.exe` and `ffprobe.exe` next to the executable.
 
 ### macOS / Linux
 
@@ -165,6 +165,8 @@ For each anime folder, AniDock writes a manifest:
 ```text
 downloads/<Anime Name>/.<Anime Name>.download_manifest.json
 ```
+
+On Windows the manifest file is hidden by default.
 
 From CLI queue setup you can:
 - resume unfinished episodes

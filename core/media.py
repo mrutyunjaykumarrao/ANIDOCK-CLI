@@ -2,9 +2,38 @@ import os
 import shutil
 import subprocess
 import json
+import sys
 
 from core.models import OutputContainerPolicy
 from core.network import fetch, locked_print
+
+
+def _resolve_tool_path(tool_name: str) -> str | None:
+    resolved = shutil.which(tool_name)
+    if resolved:
+        return resolved
+    suffix = ".exe" if os.name == "nt" else ""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        candidates.append(os.path.dirname(sys.executable))
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        candidates.append(bundle_root)
+    for base_dir in candidates:
+        if not base_dir:
+            continue
+        candidate = os.path.join(base_dir, tool_name + suffix)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def resolve_ffmpeg_path() -> str | None:
+    return _resolve_tool_path("ffmpeg")
+
+
+def resolve_ffprobe_path() -> str | None:
+    return _resolve_tool_path("ffprobe")
 
 
 def has_enough_space_for_conversion(source_path: str, required_multiplier: float = 1.10) -> bool:
@@ -16,7 +45,7 @@ def has_enough_space_for_conversion(source_path: str, required_multiplier: float
 
 
 def file_has_video_stream(file_path: str) -> bool:
-    ffprobe_path = shutil.which("ffprobe")
+    ffprobe_path = resolve_ffprobe_path()
     if not ffprobe_path:
         return os.path.exists(file_path) and os.path.getsize(file_path) > 0
     result = subprocess.run(
@@ -39,7 +68,7 @@ def file_has_video_stream(file_path: str) -> bool:
 
 
 def _ffprobe_media_info(file_path: str) -> dict | None:
-    ffprobe_path = shutil.which("ffprobe")
+    ffprobe_path = resolve_ffprobe_path()
     if not ffprobe_path:
         return None
     result = subprocess.run(
@@ -93,6 +122,8 @@ def _media_duration_seconds(media_info: dict | None) -> float | None:
     if not isinstance(format_info, dict):
         return None
     duration_value = format_info.get("duration")
+    if duration_value is None:
+        return None
     try:
         duration = float(duration_value)
     except (TypeError, ValueError):
@@ -103,7 +134,7 @@ def _media_duration_seconds(media_info: dict | None) -> float | None:
 
 
 def verify_remux_output(source_path: str, output_path: str) -> tuple[bool, str]:
-    ffprobe_available = shutil.which("ffprobe") is not None
+    ffprobe_available = resolve_ffprobe_path() is not None
     if not ffprobe_available:
         if file_has_video_stream(output_path):
             return True, ""
@@ -189,7 +220,7 @@ def convert_ts_to_video(
             locked_print("Container policy is ts. Keeping .ts file as output.")
         return ts_path
 
-    ffmpeg_path = shutil.which("ffmpeg")
+    ffmpeg_path = resolve_ffmpeg_path()
     if not ffmpeg_path:
         if verbose:
             locked_print("ffmpeg not found. Keeping .ts file as output.")
@@ -257,7 +288,7 @@ def download_subtitle_file(subtitle_url: str, media_file_path: str) -> str:
 
 
 def mux_subtitle_into_video(video_file_path: str, subtitle_file_path: str, verbose: bool = True) -> str:
-    ffmpeg_path = shutil.which("ffmpeg")
+    ffmpeg_path = resolve_ffmpeg_path()
     if not ffmpeg_path:
         if verbose:
             locked_print("ffmpeg not found. Keeping subtitle as sidecar file.")

@@ -19,6 +19,7 @@ from core.input_parsing import (
     sanitize_file_part,
 )
 from core.manifest import load_manifest, make_manifest_path, save_manifest
+from core.media import resolve_ffmpeg_path
 from core.models import DownloadPausedError, OutputContainerPolicy
 from core.network import locked_print, set_retry_logging_enabled
 from core.progress import ProgressRenderer, summarize_episode_statuses
@@ -837,6 +838,16 @@ def main() -> None:
                 4: "ts",
             }[container_choice]
             print("Applying output container policy '{0}'.".format(output_container_policy))
+
+        ffmpeg_path = resolve_ffmpeg_path()
+        if not ffmpeg_path and (subtitle_output_mode == "mux" or output_container_policy != "ts"):
+            print(
+                _style(
+                    "ffmpeg not found; mux/remux will be skipped. Output will remain .ts with .vtt sidecar.",
+                    ANSI_YELLOW,
+                )
+            )
+            print("Install ffmpeg or place ffmpeg/ffprobe next to the executable to enable mux/remux.")
 
         break
 

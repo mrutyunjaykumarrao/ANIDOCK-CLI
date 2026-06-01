@@ -2,6 +2,7 @@ import json
 import os
 import threading
 import time
+import ctypes
 
 from core.input_parsing import sanitize_file_part
 
@@ -45,6 +46,27 @@ def save_manifest(manifest_path: str, manifest_data: dict) -> None:
     manifest_data["updated_at"] = int(time.time())
     with open(manifest_path, "w", encoding="utf-8") as manifest_file:
         json.dump(manifest_data, manifest_file, indent=2, sort_keys=True)
+    _hide_manifest_on_windows(manifest_path)
+
+
+def _hide_manifest_on_windows(manifest_path: str) -> None:
+    if os.name != "nt":
+        return
+    get_attributes = ctypes.windll.kernel32.GetFileAttributesW
+    get_attributes.argtypes = [ctypes.c_wchar_p]
+    get_attributes.restype = ctypes.c_uint32
+    set_attributes = ctypes.windll.kernel32.SetFileAttributesW
+    set_attributes.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
+    set_attributes.restype = ctypes.c_int
+    attributes = get_attributes(manifest_path)
+    if attributes == 0xFFFFFFFF:
+        print("Warning: could not read manifest attributes for hiding: {0}".format(manifest_path))
+        return
+    hidden_flag = 0x2
+    if attributes & hidden_flag:
+        return
+    if not set_attributes(manifest_path, attributes | hidden_flag):
+        print("Warning: could not hide manifest file: {0}".format(manifest_path))
 
 
 def set_manifest_episode_status(
@@ -86,4 +108,3 @@ def mark_segment_complete(
 def get_manifest_completed_segments(manifest_data: dict, episode_number: int) -> set[int]:
     values = manifest_data.get("completed_segments", {}).get(str(episode_number), [])
     return {int(item) for item in values if isinstance(item, int)}
-
