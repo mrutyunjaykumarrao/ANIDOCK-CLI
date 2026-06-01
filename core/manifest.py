@@ -44,6 +44,8 @@ def load_manifest(manifest_path: str, anime_title: str) -> dict:
 
 def save_manifest(manifest_path: str, manifest_data: dict) -> None:
     manifest_data["updated_at"] = int(time.time())
+    os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
+    _clear_readonly_on_windows(manifest_path)
     with open(manifest_path, "w", encoding="utf-8") as manifest_file:
         json.dump(manifest_data, manifest_file, indent=2, sort_keys=True)
     _hide_manifest_on_windows(manifest_path)
@@ -67,6 +69,25 @@ def _hide_manifest_on_windows(manifest_path: str) -> None:
         return
     if not set_attributes(manifest_path, attributes | hidden_flag):
         print("Warning: could not hide manifest file: {0}".format(manifest_path))
+
+
+def _clear_readonly_on_windows(manifest_path: str) -> None:
+    if os.name != "nt" or not os.path.exists(manifest_path):
+        return
+    get_attributes = ctypes.windll.kernel32.GetFileAttributesW
+    get_attributes.argtypes = [ctypes.c_wchar_p]
+    get_attributes.restype = ctypes.c_uint32
+    set_attributes = ctypes.windll.kernel32.SetFileAttributesW
+    set_attributes.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
+    set_attributes.restype = ctypes.c_int
+    attributes = get_attributes(manifest_path)
+    if attributes == 0xFFFFFFFF:
+        return
+    readonly_flag = 0x1
+    if not (attributes & readonly_flag):
+        return
+    if not set_attributes(manifest_path, attributes & ~readonly_flag):
+        print("Warning: could not clear manifest read-only attribute: {0}".format(manifest_path))
 
 
 def set_manifest_episode_status(
