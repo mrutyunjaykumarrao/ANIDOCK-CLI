@@ -6,6 +6,7 @@ import shutil
 import sys
 import threading
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from _thread import LockType
 
 import requests
 
@@ -262,7 +263,7 @@ def choose_episode_selection(
     failed_episodes: list[int] | None = None,
     manifest_path: str | None = None,
     manifest_data: dict | None = None,
-    manifest_lock: threading.Lock | None = None,
+    manifest_lock: LockType | None = None,
     output_dir: str | None = None,
     anime_title: str | None = None,
     allow_back_to_anime: bool = True,
